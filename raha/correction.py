@@ -58,6 +58,7 @@ class Correction:
         self.MAX_VALUE_LENGTH = 50
         self.REVISION_WINDOW_SIZE = 5
         self.PREFER_NEVER_MODELS = True
+        self.TRACE_MODELS = False
 
     @staticmethod
     def _wikitext_segmenter(wikitext):
@@ -367,7 +368,9 @@ class Correction:
         d.labeled_cells = {} if not hasattr(d, "labeled_cells") else d.labeled_cells
         d.corrected_cells = {} if not hasattr(d, "corrected_cells") else d.corrected_cells
         d.correction_confidences = {} if not hasattr(d, "correction_confidences") else d.correction_confidences
-        d.correction_prediction_dfs = [] if not hasattr(d, "correction_prediction_dfs") else d.correction_prediction_dfs
+        if self.TRACE_MODELS:
+            d.correction_prediction_dfs = [] if not \
+                hasattr(d, "correction_prediction_dfs") else d.correction_prediction_dfs
         return d
 
     def initialize_models(self, d):
@@ -487,11 +490,12 @@ class Correction:
         d.pair_features = {}
         pairs_counter = 0
         process_args_list = [[d, cell] for cell in d.detected_cells]
-        pool = multiprocessing.Pool(2)
-        # feature_generation_results = list(map(self._feature_generator_process, process_args_list))
-        feature_generation_results = pool.map(self._feature_generator_process, process_args_list)
-        pool.close()
-        for ci, corrections_features in enumerate(feature_generation_results):
+        #pool = multiprocessing.Pool(2)
+        #feature_generation_results = list(map(self._feature_generator_process, process_args_list))
+        #feature_generation_results = pool.map(self._feature_generator_process, process_args_list)
+        #pool.close()
+        #for ci, corrections_features in enumerate(feature_generation_results):
+        for ci, corrections_features in enumerate(map(self._feature_generator_process, process_args_list)):
             cell = process_args_list[ci][1]
             d.pair_features[cell] = {}
             for correction in corrections_features:
@@ -504,7 +508,8 @@ class Correction:
         """
         This method predicts
         """
-        d.correction_prediction_dfs.append({})
+        if self.TRACE_MODELS:
+            d.correction_prediction_dfs.append({})
         correction_application_counter = {}
         method_used = {}
         train_size = {}
@@ -555,12 +560,13 @@ class Correction:
                     predicted_probabilities = classification_model.predict_proba(x_test)
                     method_used[j] = "Train"
 
-                result_df = DataFrame.from_dict({"cell": [x[0] for x in test_cell_correction_list],
-                                                 "correction": [x[1] for x in test_cell_correction_list],
-                                                 "prediction": predicted_labels,
-                                                 "probability": predicted_probabilities[:, 1]})
+                if self.TRACE_MODELS:
+                    result_df = DataFrame.from_dict({"cell": [x[0] for x in test_cell_correction_list],
+                                                     "correction": [x[1] for x in test_cell_correction_list],
+                                                     "prediction": predicted_labels,
+                                                     "probability": predicted_probabilities[:, 1]})
+                    d.correction_prediction_dfs[-1][j] = result_df
 
-                d.correction_prediction_dfs[-1][j] = result_df
                 correction_application_counter[j] = [0, 0]
 
                 if not self.PREFER_NEVER_MODELS:
@@ -572,7 +578,8 @@ class Correction:
                         confidence = predicted_probabilities[index][1]
                         if predicted_label:
                             if cell not in d.correction_confidences or confidence > d.correction_confidences[cell]:
-                                if cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction:
+                                if cell not in d.corrected_cells or \
+                                        (cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction):
                                     correction_application_counter[j][1] += 1
                                 d.correction_confidences[cell] = confidence
                                 d.corrected_cells[cell] = predicted_correction
@@ -590,7 +597,8 @@ class Correction:
                         if predicted_label:
                             if cell not in step_confidences or confidence > step_confidences[cell]:
                                 step_confidences[cell] = confidence
-                                if cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction:
+                                if cell not in d.corrected_cells or \
+                                        (cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction):
                                     correction_application_counter[j][1] += 1
                                 d.correction_confidences[cell] = confidence
                                 d.corrected_cells[cell] = predicted_correction
@@ -602,9 +610,10 @@ class Correction:
             print("Train sizes in this step:")
             for column, size in train_size.items():
                 print(f"    Column {column}: {size}")
-            print("Corrections identified in this step:")
-            for column, df in d.correction_prediction_dfs[-1].items():
-                print(f"    Column {column}: {df['prediction'].sum()} Mean correction confidence: {df.loc[df['prediction'] == 1, 'probability'].mean()}")
+            if self.TRACE_MODELS:
+                print("Corrections identified in this step:")
+                for column, df in d.correction_prediction_dfs[-1].items():
+                    print(f"    Column {column}: {df['prediction'].sum()} Mean correction confidence: {df.loc[df['prediction'] == 1, 'probability'].mean()}")
             print("Corrections applied in this step:")
             for column, counter in correction_application_counter.items():
                 print(f"    Column {column}: {counter[0]} Real changes: {counter[1]}")

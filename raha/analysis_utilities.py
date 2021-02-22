@@ -47,25 +47,29 @@ def get_correction_confidence_df(d, actual_errors):
 def correction_confidence_distributions(correction_confidence_df):
     print("Distribution of confidences for wrong (False) and correct (True) corrections:")
 
-    correction_confidence_df.hist(by="correct", column="confidence", sharey=True)
+    correction_confidence_df.hist(by="correct", column="confidence", sharey=True, bins=np.linspace(0.5,1.0,21))
 
 
 def correction_correctness_by_confidence(correction_confidence_df):
     print("Empirical probability of a correction being wrong given its confidence:")
 
+    true_confidences = correction_confidence_df.loc[correction_confidence_df["correct"], "confidence"]
     false_confidences = correction_confidence_df.loc[~correction_confidence_df["correct"], "confidence"]
     evidence = correction_confidence_df.loc[:, "confidence"]
 
-    evidence_hist, _ = np.histogram(evidence, bins=np.linspace(0.5, 1.0, 21))
-    false_hist, _ = np.histogram(false_confidences, bins=np.linspace(0.5, 1.0, 21))
+    evidence_hist, _ = np.histogram(evidence, bins=np.linspace(0.5, 1.0, 6))
+    false_hist, _ = np.histogram(false_confidences, bins=np.linspace(0.5, 1.0, 6))
+    true_hist, _ = np.histogram(true_confidences, bins=np.linspace(0.5, 1.0, 6))
 
     # print(evidence_hist)
     # print(false_hist)
 
     error_probability = np.divide(false_hist, np.where(evidence_hist == 0, 1, evidence_hist))
+    correct_probability = np.divide(true_hist, np.where(evidence_hist == 0, 1, evidence_hist))
     # print(len(np.arange(0.5, 1.0, 0.05)))
 
-    fig = plt.figure()
+    fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    plt.bar(np.arange(0.5, 1.0, 0.025), error_probability, width=0.025, align="edge")
+    ax1.bar(np.arange(0.5, 1.0, 0.1), error_probability, width=0.1, align="edge")
+    ax2.bar(np.arange(0.5, 1.0, 0.1), correct_probability, width=0.1, align="edge")
     return fig
