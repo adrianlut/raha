@@ -138,7 +138,6 @@ class Detection:
         d.labeled_cells = {} if not hasattr(d, "labeled_cells") else d.labeled_cells
         d.labels_per_cluster = {} if not hasattr(d, "labels_per_cluster") else d.labels_per_cluster
         d.detected_cells = {} if not hasattr(d, "detected_cells") else d.detected_cells
-        d.undetected_cells = {} if not hasattr(d, "undetected_cells") else d.undetected_cells
         return d
 
     def run_strategies(self, d):
@@ -336,7 +335,6 @@ class Detection:
         This method predicts the label of data cells.
         """
         detected_cells_dictionary = {}
-        undetected_cells = {}
         for j in range(d.dataframe.shape[1]):
             feature_vectors = d.column_features[j]
             x_train = [feature_vectors[i, :] for i in range(d.dataframe.shape[0]) if (i, j) in d.extended_labeled_cells]
@@ -345,10 +343,8 @@ class Detection:
             x_test = feature_vectors
             if sum(y_train) == len(y_train):
                 predicted_labels = numpy.ones(d.dataframe.shape[0])
-                predicted_prop = numpy.ones((d.dataframe.shape[0], 2)) * numpy.array([[0.0, 1.0]])
             elif sum(y_train) == 0 or len(x_train[0]) == 0:
                 predicted_labels = numpy.zeros(d.dataframe.shape[0])
-                predicted_prop = numpy.ones((d.dataframe.shape[0], 2)) * numpy.array([[1.0, 0.0]])
             else:
                 if self.CLASSIFICATION_MODEL == "ABC":
                     classification_model = sklearn.ensemble.AdaBoostClassifier(n_estimators=100)
@@ -366,16 +362,12 @@ class Detection:
                     classification_model = sklearn.svm.SVC(kernel="sigmoid")
                 classification_model.fit(x_train, y_train)
                 predicted_labels = classification_model.predict(x_test)
-                predicted_prop = classification_model.predict_proba(x_test)
-            for i, (pl, pp) in enumerate(zip(predicted_labels, predicted_prop)):
+            for i, pl in enumerate(predicted_labels):
                 if (i in d.labeled_tuples and d.extended_labeled_cells[(i, j)]) or (i not in d.labeled_tuples and pl):
-                    detected_cells_dictionary[(i, j)] = pp
-                else:
-                    undetected_cells[(i, j)] = pp
+                    detected_cells_dictionary[(i, j)] = "JUST A DUMMY VALUE"
             if self.VERBOSE:
                 print("A classifier is trained and applied on column {}.".format(j))
         d.detected_cells.update(detected_cells_dictionary)
-        d.undetected_cells.update(undetected_cells)
 
     def store_results(self, d):
         """

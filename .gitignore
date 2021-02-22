@@ -1,0 +1,5 @@
+*.dictionary
+*.pyc
+*.dataset
+*-checkpoint.ipynb
+.idea

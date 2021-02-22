@@ -29,7 +29,6 @@ import sklearn.svm
 import sklearn.ensemble
 import sklearn.naive_bayes
 import sklearn.linear_model
-from pandas import DataFrame
 
 import raha
 ########################################
@@ -57,7 +56,6 @@ class Correction:
         self.MIN_CORRECTION_OCCURRENCE = 2
         self.MAX_VALUE_LENGTH = 50
         self.REVISION_WINDOW_SIZE = 5
-        self.PREFER_NEVER_MODELS = True
 
     @staticmethod
     def _wikitext_segmenter(wikitext):
@@ -366,8 +364,6 @@ class Correction:
         d.labeled_tuples = {} if not hasattr(d, "labeled_tuples") else d.labeled_tuples
         d.labeled_cells = {} if not hasattr(d, "labeled_cells") else d.labeled_cells
         d.corrected_cells = {} if not hasattr(d, "corrected_cells") else d.corrected_cells
-        d.correction_confidences = {} if not hasattr(d, "correction_confidences") else d.correction_confidences
-        d.correction_prediction_dfs = [] if not hasattr(d, "correction_prediction_dfs") else d.correction_prediction_dfs
         return d
 
     def initialize_models(self, d):
@@ -487,8 +483,7 @@ class Correction:
         d.pair_features = {}
         pairs_counter = 0
         process_args_list = [[d, cell] for cell in d.detected_cells]
-        pool = multiprocessing.Pool(2)
-        # feature_generation_results = list(map(self._feature_generator_process, process_args_list))
+        pool = multiprocessing.Pool()
         feature_generation_results = pool.map(self._feature_generator_process, process_args_list)
         pool.close()
         for ci, corrections_features in enumerate(feature_generation_results):
@@ -504,11 +499,6 @@ class Correction:
         """
         This method predicts
         """
-        d.correction_prediction_dfs.append({})
-        correction_application_counter = {}
-        method_used = {}
-        train_size = {}
-
         for j in d.column_errors:
             x_train = []
             y_train = []
@@ -521,11 +511,9 @@ class Correction:
                             x_train.append(d.pair_features[cell][correction])
                             y_train.append(int(correction == d.labeled_cells[cell][1]))
                             d.corrected_cells[cell] = d.labeled_cells[cell][1]
-                            d.correction_confidences[cell] = 1.0
                         else:
                             x_test.append(d.pair_features[cell][correction])
                             test_cell_correction_list.append([cell, correction])
-            train_size[j] = len(x_train)
             if self.CLASSIFICATION_MODEL == "ABC":
                 classification_model = sklearn.ensemble.AdaBoostClassifier(n_estimators=100)
             if self.CLASSIFICATION_MODEL == "DTC":
@@ -543,71 +531,21 @@ class Correction:
             if x_train and x_test:
                 if sum(y_train) == 0:
                     predicted_labels = numpy.zeros(len(x_test))
-                    predicted_probabilities = numpy.ones((len(x_test), 2)) * numpy.array([[1.0, 0.0]])
-                    method_used[j] = "No train 0"
                 elif sum(y_train) == len(y_train):
                     predicted_labels = numpy.ones(len(x_test))
-                    predicted_probabilities = numpy.ones((len(x_test), 2)) * numpy.array([[0.0, 1.0]])
-                    method_used[j] = "No train 1"
                 else:
                     classification_model.fit(x_train, y_train)
                     predicted_labels = classification_model.predict(x_test)
-                    predicted_probabilities = classification_model.predict_proba(x_test)
-                    method_used[j] = "Train"
-
-                result_df = DataFrame.from_dict({"cell": [x[0] for x in test_cell_correction_list],
-                                                 "correction": [x[1] for x in test_cell_correction_list],
-                                                 "prediction": predicted_labels,
-                                                 "probability": predicted_probabilities[:, 1]})
-
-                d.correction_prediction_dfs[-1][j] = result_df
-                correction_application_counter[j] = [0, 0]
-
-                if not self.PREFER_NEVER_MODELS:
-
-                    # New corrections are applied, if the confidence is higher than the confidence before
-
-                    for index, predicted_label in enumerate(predicted_labels):
-                        cell, predicted_correction = test_cell_correction_list[index]
-                        confidence = predicted_probabilities[index][1]
-                        if predicted_label:
-                            if cell not in d.correction_confidences or confidence > d.correction_confidences[cell]:
-                                if cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction:
-                                    correction_application_counter[j][1] += 1
-                                d.correction_confidences[cell] = confidence
-                                d.corrected_cells[cell] = predicted_correction
-                                correction_application_counter[j][0] += 1
-                else:
-
-                    # New corrections are applied if their confidence is higher than the confidence of other corrections
-                    # for the same cell in this step. Later steps are preferred. This is the original semantics.
-
-                    step_confidences = {}
-
-                    for index, predicted_label in enumerate(predicted_labels):
-                        cell, predicted_correction = test_cell_correction_list[index]
-                        confidence = predicted_probabilities[index][1]
-                        if predicted_label:
-                            if cell not in step_confidences or confidence > step_confidences[cell]:
-                                step_confidences[cell] = confidence
-                                if cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction:
-                                    correction_application_counter[j][1] += 1
-                                d.correction_confidences[cell] = confidence
-                                d.corrected_cells[cell] = predicted_correction
-                                correction_application_counter[j][0] += 1
+                # predicted_probabilities = classification_model.predict_proba(x_test)
+                # correction_confidence = {}
+                for index, predicted_label in enumerate(predicted_labels):
+                    cell, predicted_correction = test_cell_correction_list[index]
+                    # confidence = predicted_probabilities[index][1]
+                    if predicted_label:
+                        # if cell not in correction_confidence or confidence > correction_confidence[cell]:
+                        #     correction_confidence[cell] = confidence
+                        d.corrected_cells[cell] = predicted_correction
         if self.VERBOSE:
-            print("Prediction Method in this step:")
-            for column, method in method_used.items():
-                print(f"    Column {column}: {method}")
-            print("Train sizes in this step:")
-            for column, size in train_size.items():
-                print(f"    Column {column}: {size}")
-            print("Corrections identified in this step:")
-            for column, df in d.correction_prediction_dfs[-1].items():
-                print(f"    Column {column}: {df['prediction'].sum()} Mean correction confidence: {df.loc[df['prediction'] == 1, 'probability'].mean()}")
-            print("Corrections applied in this step:")
-            for column, counter in correction_application_counter.items():
-                print(f"    Column {column}: {counter[0]} Real changes: {counter[1]}")
             print("{:.0f}% ({} / {}) of data errors are corrected.".format(100 * len(d.corrected_cells) / len(d.detected_cells),
                                                                            len(d.corrected_cells), len(d.detected_cells)))
 
