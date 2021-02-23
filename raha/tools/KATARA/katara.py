@@ -1,6 +1,15 @@
 
 
 def load_file(domin_specific_file, domain_specific_types, rel2sub2obj):
+    """
+    Loads the TSV into the dictionary rel2sub2obj and the subjects into the set domain_specific_types
+
+    Parameters
+    ----------
+    domin_specific_file
+    domain_specific_types
+    rel2sub2obj
+    """
     for line in domin_specific_file:
         splits = line.replace('\n', '').split('\t')
         if len(splits) < 3:
@@ -19,6 +28,20 @@ def load_file(domin_specific_file, domain_specific_types, rel2sub2obj):
 
 
 def domain_spec_col_type(data, col, domain_specific_types, col_2_errors_repair, type_coverage, ignore_null):
+    """
+    Checks the column against the set. Column and set are considered a match if at last type_coverage of all values in
+    the column match an entry in the set domain_specific_types. If the column matches, all misses are considered
+    erroneous and are added to the col_2_errors_repair dict.
+
+    Parameters
+    ----------
+    data
+    col
+    domain_specific_types
+    col_2_errors_repair
+    type_coverage
+    ignore_null
+    """
     values = [row[col] for row in data]
 
     lowercase_types = {domain_type.lower() for domain_type in domain_specific_types}
@@ -41,6 +64,20 @@ def domain_spec_col_type(data, col, domain_specific_types, col_2_errors_repair, 
 
 
 def domain_spec_colpair(data, i, j, rel2sub2obj, col_2_errors_repair, pair_coverage, ignore_null):
+    """
+    Checks two columns i and j against a relation. Checks if i is the subject and j is the object or the other way
+    around. If a match is found, objects that violate the matched relation are marked as errors.
+
+    Parameters
+    ----------
+    data
+    i
+    j
+    rel2sub2obj
+    col_2_errors_repair
+    pair_coverage
+    ignore_null
+    """
     for rel in rel2sub2obj:
         count = 0               # counts i to j relation
         back_count = 0          # counts j to i relation
@@ -74,6 +111,21 @@ def domain_spec_colpair(data, i, j, rel2sub2obj, col_2_errors_repair, pair_cover
 
 
 def run(data, domin_specific_file_path, type_coverage=0.2, pair_coverage=0.15, ignore_null=True):
+    """
+    Checks all columns and all pairs of two columns in data.dataframe against the relation in domin_specific_file_path.
+
+    Parameters
+    ----------
+    data
+    domin_specific_file_path
+    type_coverage
+    pair_coverage
+    ignore_null
+
+    Returns
+    -------
+
+    """
     data = data.dataframe.to_numpy().tolist()
     domain_specific_types = set()
     rel2sub2obj = {}
