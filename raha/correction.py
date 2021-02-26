@@ -59,6 +59,8 @@ class Correction:
         self.REVISION_WINDOW_SIZE = 5
         self.PREFER_NEVER_MODELS = True
         self.TRACE_MODELS = False
+        self.CORRECTION_COLLECTION = True
+        self.MIN_ALTERNATIVE_PROBABILITY = 0.5
 
     @staticmethod
     def _wikitext_segmenter(wikitext):
@@ -371,6 +373,8 @@ class Correction:
         if self.TRACE_MODELS:
             d.correction_prediction_dfs = [] if not \
                 hasattr(d, "correction_prediction_dfs") else d.correction_prediction_dfs
+        if self.CORRECTION_COLLECTION:
+            d.correction_collection = {} if not hasattr(d, "correction_collection") else d.correction_collection
         return d
 
     def initialize_models(self, d):
@@ -603,6 +607,21 @@ class Correction:
                                 d.correction_confidences[cell] = confidence
                                 d.corrected_cells[cell] = predicted_correction
                                 correction_application_counter[j][0] += 1
+
+                        if self.CORRECTION_COLLECTION and (predicted_label or
+                                                           self.MIN_ALTERNATIVE_PROBABILITY < 0.5
+                                                           and confidence >= self.MIN_ALTERNATIVE_PROBABILITY):
+                            if cell in d.correction_collection:
+                                if predicted_correction in d.correction_collection[cell]:
+                                    # If the prediction was predicted before, only update the confidence if it is
+                                    # higher than the already recorded confidence
+                                    if confidence > d.correction_collection[cell][predicted_correction]:
+                                        d.correction_collection[cell][predicted_correction] = confidence
+                                else:
+                                    d.correction_collection[cell][predicted_correction] = confidence
+                            else:
+                                d.correction_collection[cell] = {predicted_correction: confidence}
+
         if self.VERBOSE:
             print("Prediction Method in this step:")
             for column, method in method_used.items():

@@ -1,3 +1,4 @@
+from random import sample
 from typing import Dict, Tuple
 
 import pandas as pd
@@ -138,3 +139,65 @@ def result_analysis(data: DataFrame, correction_dict: Dict[Tuple[int, int], any]
     else:
         return "No Changes"
 
+
+def print_feature_vector(v):
+    print("[", end="")
+    print(*[f"{feature:.2f}" for feature in v], sep=" ", end="")
+    print("]")
+
+
+def explain_detection(d, cell):
+    print(f"Original Value: '{d.dataframe.iloc[cell]}'")
+    print(f"Label: {int(cell in d.detected_cells)}")
+    print(f"Confidence: {d.detected_cells[cell][1] if cell in d.detected_cells else d.undetected_cells[cell][0]}")
+    k = max(d.cells_clusters_k_j_ce.keys())
+    column = cell[1]
+    cluster_id = d.cells_clusters_k_j_ce[k][column][cell]
+    print(f"Cell belongs to cluster (Column {column}, Cluster {cluster_id})")
+    print(f"Total number of cells in this cluster: {len(d.clusters_k_j_c_ce[k][column][cluster_id])}")
+
+    labeled_cells = d.labels_per_cluster[(column, cluster_id)]
+
+    if cell in d.extended_labeled_cells and not cell in d.labeled_cells:
+        print(f"Cell was labeled by cluster label extension with label {d.extended_labeled_cells[cell]}")
+
+        cluster_cells = list(d.clusters_k_j_c_ce[k][column][cluster_id].keys())
+        cluster_cell_rows = [cluster_cell[0] for cluster_cell in cluster_cells]
+
+        if len(cluster_cells) > 1:
+            print("Other cells in the same cluster (sample of max 5 cells):")
+            example_cells = sample(cluster_cells, min(len(cluster_cells), 5))
+            for example_cell in example_cells:
+                print(f"{example_cell}: '{d.dataframe.iloc[example_cell]}' Features: {d.column_features[column][example_cell[0], :]}")
+
+            print("Mean of all feature vectors in the cluster and feature vector of the current cell for comparison:")
+            print_feature_vector(d.column_features[column][cluster_cell_rows].mean(axis=0))
+            print_feature_vector(d.column_features[column][cell[0]])
+        else:
+            print("This cell is the only cell in its cluster.")
+
+        print("This cluster was labeled because of the user labels of the following cells in its cluster: ")
+        for labeled_cell, label in labeled_cells.items():
+                print(f"{labeled_cell}: '{d.dataframe.iloc[labeled_cell]}' Label: {label}")
+    elif cell in d.labeled_cells:
+        print(f"This cell was labeled by the user with label {d.labeled_cells[cell]}")
+    else:
+        print(f"This cell is not part of a labeled cluster. It was labeled by the classification.")
+
+        if len(labeled_cells) > 0:
+            print("However, there are the following labeled cells in its cluster:")
+            for labeled_cell, label in labeled_cells.items():
+                print(f"{labeled_cell}: '{d.dataframe.iloc[labeled_cell]}' Label: {label}")
+        else:
+            print("There are no labeled cells in its cluster.")
+
+
+def alternative_corrections_overview(d, cell):
+    print(f"Correction: {d.corrected_cells[cell]}")
+    print(f"Correction confidence: {d.correction_confidences[cell]}")
+    print(f"Alternative corrections and their confidence values: {d.correction_collection[cell]}")
+    if d.correction_confidences[cell] < d.correction_collection[cell][d.corrected_cells[cell]]:
+        print("Hint: The actual correction is included in the alternative corrections and the confidence value\n"
+              "in the alternative corrections can be higher. This is because of baran prefering models trained with\n"
+              "more examples. The alternative correction contains the maximum confidence for every repair value recorded\n"
+              "over the cleaning process.")
