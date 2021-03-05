@@ -16,7 +16,6 @@ def detection_evaluation(d, actual_errors):
     p_df = p_df[["row", "column", "p"]]
     p_df["truth"] = [cell[0] in actual_errors for cell in detected_cell_list]
     p_df["detected"] = True
-    #p_df.hist(by="correct", column="p", bins=np.linspace(0.5, 1.0, 21))
 
     undetected_cell_list = list(d.undetected_cells.items())
 
@@ -26,13 +25,26 @@ def detection_evaluation(d, actual_errors):
     p_df_n["truth"] = [cell[0] in actual_errors for cell in undetected_cell_list]
     p_df_n["detected"] = False
 
-    #p_df_n.hist(by="correct", column="p", bins=np.linspace(0.0, 0.5, 21))
+    fig, axes = plt.subplots(2, 2, sharex="all")
 
-    print("Histograms of the probabilities of the detection algorithm by (label, true label)")
+    fig.suptitle("Histograms of the probabilities of the detection algorithm by (label, true label)\n"
+                 "y axis is not shared!")
+
+    axes = axes[::-1]
+    axes[0] = axes[0][::-1]
+    axes[1] = axes[1][::-1]
+
+    axes[0][1].set_ylabel("Count")
+    axes[1][1].set_ylabel("Count")
+    axes[0][0].set_xlabel("Confidence")
+    axes[0][1].set_xlabel("Confidence")
+
     pd.concat([p_df, p_df_n]).hist(by=["detected", "truth"],
                                    column="p",
                                    bins=np.linspace(0.0, 1.0, 21),
-                                   sharex=True)
+                                   ax=axes)
+    plt.close()  # suppress automatic plotting in notebook environments
+    return fig
 
 
 def get_correction_confidence_df(d, actual_errors):
@@ -48,21 +60,29 @@ def get_correction_confidence_df(d, actual_errors):
 
 
 def correction_confidence_distributions(correction_confidence_df):
-    print("Distribution of confidences for wrong (False) and correct (True) corrections:")
+    fig, axes = plt.subplots(1, 2, sharey="all")
 
-    correction_confidence_df.hist(by="correct", column="confidence", sharey=True, bins=np.linspace(0.5,1.0,21))
+    fig.suptitle("Distribution of confidences for wrong (False) and correct (True) corrections:")
+
+    axes[0].set_ylabel("Count")
+    for ax in axes:
+        ax.set_xlabel("Confidence")
+    correction_confidence_df.hist(by="correct", column="confidence", bins=np.linspace(0.5, 1.0, 21), ax=axes)
+
+    plt.close()  # suppress automatic plotting in notebook environments
+
+    return fig
 
 
-def correction_correctness_by_confidence(correction_confidence_df):
-    print("Empirical probability of a correction being wrong given its confidence:")
+def correction_correctness_by_confidence(correction_confidence_df, number_of_bins=5):
 
     true_confidences = correction_confidence_df.loc[correction_confidence_df["correct"], "confidence"]
     false_confidences = correction_confidence_df.loc[~correction_confidence_df["correct"], "confidence"]
     evidence = correction_confidence_df.loc[:, "confidence"]
 
-    evidence_hist, _ = np.histogram(evidence, bins=np.linspace(0.5, 1.0, 6))
-    false_hist, _ = np.histogram(false_confidences, bins=np.linspace(0.5, 1.0, 6))
-    true_hist, _ = np.histogram(true_confidences, bins=np.linspace(0.5, 1.0, 6))
+    evidence_hist, _ = np.histogram(evidence, bins=np.linspace(0.5, 1.0, number_of_bins + 1))
+    false_hist, _ = np.histogram(false_confidences, bins=np.linspace(0.5, 1.0, number_of_bins + 1))
+    true_hist, _ = np.histogram(true_confidences, bins=np.linspace(0.5, 1.0, number_of_bins + 1))
 
     # print(evidence_hist)
     # print(false_hist)
@@ -73,10 +93,21 @@ def correction_correctness_by_confidence(correction_confidence_df):
 
     fig, (ax1, ax2) = plt.subplots(1, 2, sharey="all", sharex="all")
 
-    ax1.set_ylim([0.0, 1.0])
+    fig.suptitle("Empirical probability of a correction being correct/ wrong given its confidence")
 
-    ax1.bar(np.arange(0.5, 1.0, 0.1), error_probability, width=0.1, align="edge")
-    ax2.bar(np.arange(0.5, 1.0, 0.1), correct_probability, width=0.1, align="edge")
+    ax1.set_title("Error probability per confidence interval")
+    ax2.set_title("Correctness probability per confidence interval")
+
+    ax1.set_ylim([0.0, 1.0])
+    ax1.set_ylabel("Error Probability")
+    ax2.set_ylabel("Correctness Probability")
+    ax1.set_xlabel("Confidence")
+    ax2.set_xlabel("Confidence")
+
+    ax1.bar(np.arange(0.5, 1.0, 0.5 / number_of_bins), error_probability, width=0.5 / number_of_bins, align="edge")
+    ax2.bar(np.arange(0.5, 1.0, 0.5 / number_of_bins), correct_probability, width=0.5 / number_of_bins, align="edge")
+
+    plt.close()  # suppress automatic plotting in notebook environments
     return fig
 
 
