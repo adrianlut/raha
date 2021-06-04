@@ -61,6 +61,7 @@ class Correction:
         self.TRACE_MODELS = False
         self.CORRECTION_COLLECTION = True
         self.MIN_ALTERNATIVE_PROBABILITY = 0.5
+        self.PREFER_HIGHER_PROBABILITY = True
 
     @staticmethod
     def _wikitext_segmenter(wikitext):
@@ -599,8 +600,16 @@ class Correction:
                         cell, predicted_correction = test_cell_correction_list[index]
                         confidence = predicted_probabilities[index][1]
                         if predicted_label:
-                            if cell not in step_confidences or confidence > step_confidences[cell]:
-                                step_confidences[cell] = confidence
+                            if self.PREFER_HIGHER_PROBABILITY:
+                                if cell not in step_confidences or confidence > step_confidences[cell]:
+                                    step_confidences[cell] = confidence
+                                    if cell not in d.corrected_cells or \
+                                            (cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction):
+                                        correction_application_counter[j][1] += 1
+                                    d.correction_confidences[cell] = confidence
+                                    d.corrected_cells[cell] = predicted_correction
+                                    correction_application_counter[j][0] += 1
+                            else:
                                 if cell not in d.corrected_cells or \
                                         (cell in d.corrected_cells and d.corrected_cells[cell] != predicted_correction):
                                     correction_application_counter[j][1] += 1

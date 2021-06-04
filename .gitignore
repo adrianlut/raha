@@ -3,3 +3,4 @@
 *.dataset
 *-checkpoint.ipynb
 .idea
+*.pdf

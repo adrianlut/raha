@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from IPython.display import display
 
 
+default_figsize = (9, 6)
+
+
 def get_detection_evaluation_df(d):
     actual_errors = d.get_actual_errors_dictionary()
     detected_cell_list = list(d.detected_cells.items())
@@ -29,8 +32,8 @@ def get_detection_evaluation_df(d):
     return pd.concat([p_df, p_df_n])
 
 
-def detection_evaluation(detection_evaluation_df, number_of_bins=10, sharey="none"):
-    fig, axes = plt.subplots(2, 2, sharex="all", sharey=sharey, figsize=(16, 9))
+def detection_evaluation(detection_evaluation_df, number_of_bins=10, sharey="none", figsize=default_figsize):
+    fig, axes = plt.subplots(2, 2, sharex="all", sharey=sharey, figsize=figsize)
 
     #fig.suptitle("Histograms of the probabilities of the detection algorithm by (label, true label)\n"
                  #"y axis is not shared!")
@@ -62,14 +65,14 @@ def detection_evaluation(detection_evaluation_df, number_of_bins=10, sharey="non
     axes[1][0].set_title("False positive")
     axes[1][1].set_title("True positive")
 
-    plt.subplots_adjust(hspace=0.12, wspace=0.1, left=0.05, right=0.95, top=0.95, bottom=0.1)
+    plt.subplots_adjust(hspace=0.12, wspace=0.1)
 
     plt.close()  # suppress automatic plotting in notebook environments
     return fig
 
 
-def detection_evaluation_without_grouping(detection_evaluation_df, number_of_bins=10):
-    fig = plt.figure()
+def detection_evaluation_without_grouping(detection_evaluation_df, number_of_bins=10, figsize=default_figsize):
+    fig = plt.figure(figsize=figsize)
     ax = plt.axes()
 
     ax.set_xlabel("Probability")
@@ -171,8 +174,8 @@ def get_correction_confidence_df(d):
                       "correct": is_correctly_corrected})
 
 
-def correction_confidence_distribution(correction_confidence_df, number_of_bins=20):
-    fig = plt.figure()
+def correction_confidence_distribution(correction_confidence_df, number_of_bins=20, figsize=default_figsize):
+    fig = plt.figure(figsize=figsize)
     ax = plt.axes()
 
     #fig.suptitle("Distribution of confidences for wrong (False) and correct (True) corrections:")
@@ -189,8 +192,8 @@ def correction_confidence_distribution(correction_confidence_df, number_of_bins=
     return fig
 
 
-def correction_confidence_distributions(correction_confidence_df, number_of_bins=20):
-    fig, axes = plt.subplots(1, 2, sharey="all")
+def correction_confidence_distributions(correction_confidence_df, number_of_bins=20, figsize=default_figsize):
+    fig, axes = plt.subplots(1, 2, sharey="all", figsize=figsize)
 
     #fig.suptitle("Distribution of confidences for wrong (False) and correct (True) corrections:")
 
@@ -205,7 +208,7 @@ def correction_confidence_distributions(correction_confidence_df, number_of_bins
     axes[0].set_title("Wrong repairs")
     axes[1].set_title("Correct repairs")
 
-    plt.subplots_adjust(wspace=0.1, left=0.1, right=0.95, top=0.95, bottom=0.1)
+    plt.subplots_adjust(wspace=0.1)
     plt.close()  # suppress automatic plotting in notebook environments
 
     return fig
